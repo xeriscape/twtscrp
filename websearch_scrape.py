@@ -11,6 +11,7 @@ from lxml import html
 import lxml
 from time import gmtime, strftime
 import time
+import hashlib
 
 #-------------------------------------------------------------------------------------------------
 def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_realtime="True"):
@@ -18,7 +19,17 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 	   JSON data with which Twitter answers. Fields are (focused_refresh_interval, has_more_items,
 	   is_refresh_request, is_scrolling_request, items_html, refresh_cursor, scroll cursor).
 
-	   Refer to http://www.twitter.com/search for operators you can use in the query format.'''
+	   Refer to http://www.twitter.com/search for operators you can use in the query format.
+
+	   Examples include:
+	   * love OR hate		   * beer -root
+	   * #haiku			       * from:alexiskold
+	   * to:techcrunch   	   * @mashable
+	   * near:NYC within:15mi  * since:2011-12-27
+	   * until:2012-12-27	   * :)
+	   * :(             	   * traffic ?
+	   * filter:links   	   * lang:en
+	   '''
 	#Set up some variables to be used later
 	r = None; data = None; success = False;
 
@@ -32,7 +43,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 	#Do the actual search. TODO: Have this stuff configured by parameters of some sort
 	success = False
-	backoff = 1.0 
+	backoff = 1.0 #Total backoff time modifier 
 	backoff_factor = 0.5 #How much the backoff increases each time
 	sleeptime = 0.75 #Wait time in seconds
 	
@@ -56,6 +67,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 		except: #... but catch other exceptions (like timeouts) and just keep trying
 			print "Error trying to retrieve {0}".format(query_url)
+			print "Retrying in {0} seconds".format(str(sleeptime*backoff))
 			backoff = backoff * (1+backoff_factor)
 			success = False
 
@@ -63,9 +75,12 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 	return data
 
 #-------------------------------------------------------------------------------------------------
-def extract_tweets(raw_html=""):
+def extract_tweets(raw_html):
 	''' This function scrapes the specified HTML string for Tweets and some related information.
 	    Returns a list of lists(username, friendly_time, timestamp, tweet_text). '''
+		
+	if (len(raw_html)==0): raise TypeError("No raw_html specified");
+		
 	#Set up some temporary and holding variables for later
 	retrieved_tweets = []; active_tweet= []; to_append="";
 
@@ -116,12 +131,15 @@ def main():
 	if (len(crsor)>0): #Cursors CAN be specified if that is wanted
 		next_cursor = crsor
 
-	#Set up the output file and CSV writer
-	filename = "tweets"
-	if (len(query)>0): filename = filename+"_"+query;
-	if (len(since)>0): filename = filename+"_from "+since;
-	if (len(until)>0): filename = filename+"_until "+until;
-	if (len(crsor)>0): filename = filename+"_starting"; #TODO: Deal with overly long file names
+	#Set up the output file and CSV writer. Search parameters are stored in a meta file.
+	#TODO: There's probably a better way to do this. Deal w/ overly long file names.
+	file_information = "Search for Tweets starting {0}\n\n--Query: {1}\n--Since: {2}\n--Until: {3}\n--Cursor: {4}".format(strftime("%Y-%m-%d %H:%M:%S"), query, since, until, starting)
+	filename = hashlib.md5(file_information).hexdigest() #;D
+	info_file_name = "{0}.meta".format(filename)
+	
+	with open('info_file_name', 'w') as f:
+		f.write(file_information)
+	
 	filename = filename + ".csv"
 
 	#Filter out some problematic characters (Windows dislikes them)
