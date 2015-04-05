@@ -133,7 +133,7 @@ def main():
 
 	#Set up the output file and CSV writer. Search parameters are stored in a meta file.
 	#TODO: There's probably a better way to do this. Deal w/ overly long file names.
-	file_information = "Search for Tweets starting {0}\n\n--Query: {1}\n--Since: {2}\n--Until: {3}\n--Cursor: {4}".format(strftime("%Y-%m-%d %H:%M:%S"), query, since, until, starting)
+	file_information = "Search for Tweets starting {0}\n\n--Query: {1}\n--Since: {2}\n--Until: {3}\n--Cursor: {4}".format(strftime("%Y-%m-%d %H:%M:%S"), query, since, until, crsor)
 	filename = hashlib.md5(file_information).hexdigest() #;D
 	info_file_name = "{0}.meta".format(filename)
 	
