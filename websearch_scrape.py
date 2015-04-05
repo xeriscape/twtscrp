@@ -138,7 +138,7 @@ def main():
 	info_file_name = "{0}.meta".format(filename)
 	
 	with open(info_file_name, 'w') as f:
-		f.write("Meta information for {0}", filename)
+		f.write("Meta information for {0}".format(filename))
 		f.write(file_information)
 	
 	filename = filename + ".csv"
