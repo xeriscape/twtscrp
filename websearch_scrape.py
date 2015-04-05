@@ -32,8 +32,10 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 	#Do the actual search. TODO: Have this stuff configured by parameters of some sort
 	success = False
+	backoff = 1.0
+	
 	while not success: #Keep trying until the request goes through AND we get a useful items_html field
-		time.sleep(1) #Throttle requests a bit. TODO: Parameter!
+		time.sleep(1*backoff) #Throttle requests a bit. TODO: Parameter!
 		r = None
 
 		try: #The following two lines are what the function actually does: GET JSON data.
@@ -41,6 +43,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 			data = r.json()
 			if len(data["items_html"])>20: #Sometimes we'll accidentally get a blank items_html field. TODO: This could be more elegant...
 				success = True
+				backoff = 1.0
 			else:
 				print "Error on {0}: items_html too short?".format(query_url)
 				success = False
@@ -51,6 +54,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 		except: #... but catch other exceptions (like timeouts) and just keep trying
 			print "Error trying to retrieve {0}".format(query_url)
+			backoff = backoff * 1.5
 			success = False
 
 	#Once we've finally managed to extract the JSON data, return that
