@@ -137,7 +137,8 @@ def main():
 	filename = hashlib.md5(file_information).hexdigest() #;D
 	info_file_name = "{0}.meta".format(filename)
 	
-	with open('info_file_name', 'w') as f:
+	with open(info_file_name, 'w') as f:
+		f.write("Meta information for {0}", filename)
 		f.write(file_information)
 	
 	filename = filename + ".csv"
