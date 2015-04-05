@@ -32,10 +32,12 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 	#Do the actual search. TODO: Have this stuff configured by parameters of some sort
 	success = False
-	backoff = 1.0
+	backoff = 1.0 
+	backoff_factor = 0.5 #How much the backoff increases each time
+	sleeptime = 0.75 #Wait time in seconds
 	
 	while not success: #Keep trying until the request goes through AND we get a useful items_html field
-		time.sleep(1*backoff) #Throttle requests a bit. TODO: Parameter!
+		time.sleep(sleeptime*backoff) #Throttle requests a bit. TODO: Parameter!
 		r = None
 
 		try: #The following two lines are what the function actually does: GET JSON data.
@@ -54,7 +56,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 		except: #... but catch other exceptions (like timeouts) and just keep trying
 			print "Error trying to retrieve {0}".format(query_url)
-			backoff = backoff * 1.5
+			backoff = backoff * (1+backoff_factor)
 			success = False
 
 	#Once we've finally managed to extract the JSON data, return that
