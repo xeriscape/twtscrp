@@ -14,7 +14,7 @@ import time
 import hashlib
 
 #-------------------------------------------------------------------------------------------------
-def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_realtime="True"):
+def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_realtime=True):
 	'''This function takes a Twitter search query and some parameters as input, and returns the 
 	   JSON data with which Twitter answers. Fields are (focused_refresh_interval, has_more_items,
 	   is_refresh_request, is_scrolling_request, items_html, refresh_cursor, scroll cursor).
@@ -43,12 +43,12 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 
 	#Do the actual search. TODO: Have this stuff configured by parameters of some sort
 	success = False
-	backoff = 1.0 #Total backoff time modifier 
+	backoff = 1.0        #Total backoff time modifier 
 	backoff_factor = 0.5 #How much the backoff increases each time
-	sleeptime = 0.75 #Wait time in seconds
+	sleeptime = 0.75     #Wait time in seconds
 	
 	while not success: #Keep trying until the request goes through AND we get a useful items_html field
-		time.sleep(sleeptime*backoff) #Throttle requests a bit. TODO: Parameter!
+		time.sleep(sleeptime*backoff) #Throttle requests a bit.
 		r = None
 
 		try: #The following two lines are what the function actually does: GET JSON data.
@@ -58,8 +58,16 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 				success = True
 				backoff = 1.0
 			else:
-				print "Error on {0}: items_html too short?".format(query_url)
-				success = False
+				#Are there more items but we didn't get them? Retry
+				if( (data["has_more_items"] == True) or (data["has_more_items"] == "true") ):
+					print "Error on {0}: items_html too short?".format(query_url)
+					print "Retrying in {0} seconds".format(str(sleeptime*backoff))
+					backoff = backoff * (1+backoff_factor)
+					success = False
+					
+				#Are there no more items? Yeah, we're done
+					success = True
+					backoff = 1.0
 
 		except (KeyboardInterrupt, SystemExit):
 			print "Process aborted at {0}".format(query_url)
@@ -115,30 +123,24 @@ def extract_tweets(raw_html):
 	return retrieved_tweets
 
 #-------------------------------------------------------------------------------------------------
-def main():
+def execute_search(query, since, until, crsor, is_realtime):
 	''' Executing this file directly lets you do one of these searches with parameters you are asked to input.
 	    Just hit Return if you don't want to specify them (that's actually possible). The filename is determined
 		by the specified parameters. '''
 	#Set up some variables for later
 	next_cursor = ""; success = False; tweet_count = 0;
 
-	#Do some inputting of search parameters. TODO: Validation
-	query = raw_input("Query?\n >   ")
-	since = raw_input("Start date (YYYY-MM-DD)?\n >   ")
-	until = raw_input("End date (YYYY-MM-DD)?\n >   ")
-	crsor = raw_input("Start cursor? (Leave blank if none)\n >   ")
-
 	if (len(crsor)>0): #Cursors CAN be specified if that is wanted
 		next_cursor = crsor
 
 	#Set up the output file and CSV writer. Search parameters are stored in a meta file.
 	#TODO: There's probably a better way to do this. Deal w/ overly long file names.
-	file_information = "Search for Tweets starting {0}\n\n--Query: {1}\n--Since: {2}\n--Until: {3}\n--Cursor: {4}".format(strftime("%Y-%m-%d %H:%M:%S"), query, since, until, crsor)
+	file_information = "This search for Tweets was started on {0}\n\n--Query: {1}\n--Since: {2}\n--Until: {3}\n--Cursor: {4}".format(strftime("%Y-%m-%d %H:%M:%S"), query, since, until, crsor)
 	filename = hashlib.md5(file_information).hexdigest() #;D
 	info_file_name = "{0}.meta".format(filename)
 	
 	with open(info_file_name, 'w') as f:
-		f.write("Meta information for {0}".format(filename))
+		f.write("Meta information for {0}\n\n".format(filename))
 		f.write(file_information)
 	
 	filename = filename + ".csv"
@@ -151,7 +153,7 @@ def main():
 	filename = filename.replace("\\","-"); filename = filename.replace("?","-");
 	
 	#Open the CSV file, specify the dialect to be used, and write some column headers
-	csvfile = open(filename, 'a')
+	csvfile = open(filename, 'ab')
 	csv.register_dialect('excel-two', delimiter=";", doublequote=True, escapechar=None, lineterminator="\r\n", quotechar='"', quoting=csv.QUOTE_MINIMAL,skipinitialspace=True)
 	output_writer = csv.writer(csvfile, dialect='excel-two')
 	csv_headers = ["Username","Time","Timestamp","Tweet"]
@@ -159,24 +161,46 @@ def main():
 
 	#Now for the actual data retrieval
 	request_count = 0
-	while True: #TODO: End a little more graciously than that :(
+	finished = False
+	
+	while not finished:
 		#Let the user know we're still working...
 		request_count = request_count + 1
 		print "{0}: Now handling Tweet set {1}...".format(strftime("%Y-%m-%d %H:%M:%S"), request_count)
 
 		#Grab data
-		data = get_search_chunk(query, since, until, next_cursor, True)
+		data = get_search_chunk(query, since, until, next_cursor, is_realtime)
+		
+		#Check if we're done
+		if( (data["has_more_items"] == False) or (data["has_more_items"] == "false") ):
+			finished = True
+			continue
+			
+		else: #If not
+			#Extract Tweets
+			tweet_sets = extract_tweets(data["items_html"])
 
-		#Extract Tweets
-		tweet_sets = extract_tweets(data["items_html"])
+			#Write to disk
+			for tweet_set in tweet_sets:
+				output_writer.writerow(tweet_set)
 
-		#Write to disk
-		for tweet_set in tweet_sets:
-			output_writer.writerow(tweet_set)
-
-		#Determine next page
-		next_cursor = data["scroll_cursor"]
+			#Determine next page
+			next_cursor = data["scroll_cursor"]
+			
+			
+	print "\n{0}: Tweet retrieval for {1} finished successfully.".format(strftime("%Y-%m-%d %H:%M:%S"), filename)
 #-------------------------------------------------------------------------------------------------
+def main():
+	#Do some inputting of search parameters. TODO: Validation
+	query = raw_input("Query? Refer to http://www.twitter.com/search for parameters\n >   ")
+	since = raw_input("Start date (YYYY-MM-DD)?\n >   ")
+	until = raw_input("End date (YYYY-MM-DD)?\n >   ")
+	crsor = raw_input("Start cursor? (Leave blank if none)\n >   ")
+	
+	execute_search(query, since, until, crsor, True)
+#-------------------------------------------------------------------------------------------------
+
+
 if __name__ == "__main__":
 	''' The usual boilerplate... '''
 	main()
