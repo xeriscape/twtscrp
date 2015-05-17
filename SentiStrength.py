@@ -50,7 +50,7 @@ def main(tweets_file):
 	csv_headers = ["Tweet", "Date", "Hour", "Polarity_Pos", "Polarity_Neg", "Polarity_Neu", "Explanation"]
 
 	#Find a list of CSV files in the specified path...
-	list_files = glob.glob('*.csv')
+	list_files = glob.glob('twts_*.csv')
 
 	#For each file
 	for lf in list_files:
