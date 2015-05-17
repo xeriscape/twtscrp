@@ -167,12 +167,16 @@ def execute_search(query, since, until, crsor, is_realtime):
 		#Let the user know we're still working...
 		request_count = request_count + 1
 		print "{0}: Now handling Tweet set {1}...".format(strftime("%Y-%m-%d %H:%M:%S"), request_count)
-
+		with open(info_file_name, 'a') as f: f.write("{0}: Now handling Tweet set starting at cursor {1}...\n".format(strftime("%Y-%m-%d %H:%M:%S"), next_cursor));
+		
+		
 		#Grab data
 		data = get_search_chunk(query, since, until, next_cursor, is_realtime)
 		
 		#Check if we're done
-		if( (data["has_more_items"] == False) or (data["has_more_items"] == "false") ):
+		if( (data["has_more_items"] == False) or (data["has_more_items"] == "false") or (data["has_more_items"] == "False" ) ):
+			print "\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S"))
+			with open(info_file_name, 'a') as f: f.write("\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S")));
 			finished = True
 			continue
 			
@@ -192,9 +196,9 @@ def execute_search(query, since, until, crsor, is_realtime):
 #-------------------------------------------------------------------------------------------------
 def main():
 	#Do some inputting of search parameters. TODO: Validation
-	query = raw_input("Query? Refer to http://www.twitter.com/search for parameters\n >   ")
-	since = raw_input("Start date (YYYY-MM-DD)?\n >   ")
-	until = raw_input("End date (YYYY-MM-DD)?\n >   ")
+	query = raw_input("Query? (Example: sony lang:en)\n >   ")
+	since = raw_input("Start date? (Example: 2011-04-15)\n >   ")
+	until = raw_input("End date? (Example: 2011-05-25)\n >   ")
 	crsor = raw_input("Start cursor? (Leave blank if none)\n >   ")
 	
 	execute_search(query, since, until, crsor, True)
