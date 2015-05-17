@@ -93,7 +93,7 @@ def extract_tweets(raw_html):
 	retrieved_tweets = []; active_tweet= []; to_append="";
 
 	#Query for username UNION time UNION timestamp UNION text
-	xpath_query = "//span[starts-with(@class,'username')] | //small[@class = 'time']/a/@title | //span[starts-with(@class, '_timestamp')]/@data-time-ms | //p[starts-with(@class,'js-tweet-text')]"
+	xpath_query = "//span[starts-with(@class,'username')] | //small[@class = 'time']/a/@title | //span[starts-with(@class, '_timestamp')]/@data-time-ms | //p[contains(@class,'js-tweet-text')]"
 	tree = html.fromstring(raw_html)
 	query_results = tree.xpath(xpath_query)
 
