@@ -59,13 +59,14 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 				backoff = 1.0
 			else:
 				#Are there more items but we didn't get them? Retry
-				if( (data["has_more_items"] == True) or (data["has_more_items"] == "true") ):
+				if( True):#(data["has_more_items"] == True) or (data["has_more_items"] == "true") ):
 					print "Error on {0}: items_html too short?".format(query_url)
 					print "Retrying in {0} seconds".format(str(sleeptime*backoff))
 					backoff = backoff * (1+backoff_factor)
 					success = False
 					
 				#Are there no more items? Yeah, we're done
+				else:
 					success = True
 					backoff = 1.0
 
@@ -174,7 +175,7 @@ def execute_search(query, since, until, crsor, is_realtime):
 		data = get_search_chunk(query, since, until, next_cursor, is_realtime)
 		
 		#Check if we're done
-		if( (data["has_more_items"] == False) or (data["has_more_items"] == "false") or (data["has_more_items"] == "False" ) ):
+		if( False ):#(data["has_more_items"] == False) or (data["has_more_items"] == "false") or (data["has_more_items"] == "False" ) ):
 			print "\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S"))
 			with open(info_file_name, 'a') as f: f.write("\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S")));
 			finished = True
