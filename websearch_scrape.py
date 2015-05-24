@@ -31,7 +31,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 	   * filter:links   	   * lang:en
 	   '''
 	#Set up some variables to be used later
-	r = None; data = None; success = False;
+	r = None; data = None; success = False; add_twt = True;
 
 	#If we want top results, not realtime results, we just leave off the "realtime" parameter
 	if (is_realtime == True): realtime_text = "f=realtime&"
@@ -46,9 +46,11 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 	backoff = 1.0        #Total backoff time modifier 
 	backoff_factor = 0.5 #How much the backoff increases each time
 	sleeptime = 0.75     #Wait time in seconds
+	max_sleep = 120      #When do we give up? (Default: When wait reaches 2 min)
 	
 	while not success: #Keep trying until the request goes through AND we get a useful items_html field
-		time.sleep(sleeptime*backoff) #Throttle requests a bit.
+		wait_time = sleeptime*backoff
+		time.sleep(wait_time) #Throttle requests a bit.
 		r = None
 
 		try: #The following two lines are what the function actually does: GET JSON data.
@@ -56,10 +58,11 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 			data = r.json()
 			if len(data["items_html"])>20: #Sometimes we'll accidentally get a blank items_html field. TODO: This could be more elegant...
 				success = True
+				add_twt = True
 				backoff = 1.0
 			else:
 				#Are there more items but we didn't get them? Retry
-				if( True):#(data["has_more_items"] == True) or (data["has_more_items"] == "true") ):
+				if( wait_time < max_sleep ):
 					print "Error on {0}: items_html too short?".format(query_url)
 					print "Retrying in {0} seconds".format(str(sleeptime*backoff))
 					backoff = backoff * (1+backoff_factor)
@@ -68,6 +71,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 				#Are there no more items? Yeah, we're done
 				else:
 					success = True
+					add_twt = False
 					backoff = 1.0
 
 		except (KeyboardInterrupt, SystemExit):
@@ -78,10 +82,15 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 			print "Error trying to retrieve {0}".format(query_url)
 			print "Retrying in {0} seconds".format(str(sleeptime*backoff))
 			backoff = backoff * (1+backoff_factor)
-			success = False
+			if (wait_time < max_sleep): 
+				success = False
+			else:
+				success = True
+				add_twt = False
+				backoff = 1.0
 
 	#Once we've finally managed to extract the JSON data, return that
-	return data
+	return [add_twt, data]
 
 #-------------------------------------------------------------------------------------------------
 def extract_tweets(raw_html):
@@ -128,11 +137,12 @@ def execute_search(query, since, until, crsor, is_realtime):
 	''' Executing this file directly lets you do one of these searches with parameters you are asked to input.
 	    Just hit Return if you don't want to specify them (that's actually possible). The filename is determined
 		by the specified parameters. '''
+		
+	if (len(crsor) < 7): #Search cursors are absurdly long, so 
+		crsor = "TWEET--" #Using this one fixes some issues with "blank" cursors	
+	
 	#Set up some variables for later
-	next_cursor = ""; success = False; tweet_count = 0;
-
-	if (len(crsor)>0): #Cursors CAN be specified if that is wanted
-		next_cursor = crsor
+	next_cursor = crsor; success = False; tweet_count = 0;
 
 	#Set up the output file and CSV writer. Search parameters are stored in a meta file.
 	#TODO: There's probably a better way to do this. Deal w/ overly long file names.
@@ -172,16 +182,12 @@ def execute_search(query, since, until, crsor, is_realtime):
 		
 		
 		#Grab data
-		data = get_search_chunk(query, since, until, next_cursor, is_realtime)
+		search_chunk = get_search_chunk(query, since, until, next_cursor, is_realtime)
 		
 		#Check if we're done
-		if( False ):#(data["has_more_items"] == False) or (data["has_more_items"] == "false") or (data["has_more_items"] == "False" ) ):
-			print "\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S"))
-			with open(info_file_name, 'a') as f: f.write("\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S")));
-			finished = True
-			continue
-			
-		else: #If not
+		if( search_chunk[0] == True ): #If data exists, process it
+			data = search_chunk[1]
+		
 			#Extract Tweets
 			tweet_sets = extract_tweets(data["items_html"])
 
@@ -191,6 +197,13 @@ def execute_search(query, since, until, crsor, is_realtime):
 
 			#Determine next page
 			next_cursor = data["scroll_cursor"]
+		
+		#No more data means we're done
+		else: # No more data means we're done
+			print "\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S"))
+			with open(info_file_name, 'a') as f: f.write("\n\n{0}: No more items remaining.\n".format(strftime("%Y-%m-%d %H:%M:%S")));
+			finished = True
+			continue
 			
 			
 	print "\n{0}: Tweet retrieval for {1} finished successfully.".format(strftime("%Y-%m-%d %H:%M:%S"), filename)
