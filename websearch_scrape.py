@@ -56,6 +56,8 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 		try: #The following two lines are what the function actually does: GET JSON data.
 			r = requests.get(query_url)
 			data = r.json()
+			test_cursor = data["scroll_cursor"] #If scroll_cursor is missing from the data for some reason, this'll throw an exception
+			
 			if len(data["items_html"])>20: #Sometimes we'll accidentally get a blank items_html field. TODO: This could be more elegant...
 				success = True
 				add_twt = True
