@@ -38,7 +38,8 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 	else: realtime_text = ""	
 	
 	#Okay, assemble the query URL
-	base_url = "https://twitter.com/i/search/timeline?{0}q={1} since:{2} until:{3}&include_available_features=1&include_entities=1&scroll_cursor={4}"
+	base_url = "https://twitter.com/i/search/timeline?q={1} since:{2} until:{3}&include_available_features=1&include_entities=1&max_position={4}"
+	#base_url = "https://twitter.com/i/search/timeline?{0}q={1} since:{2} until:{3}&include_available_features=1&include_entities=1&scroll_cursor={4}"
 	query_url = base_url.format(realtime_text, query, start_date, end_date, scroll_cursor)
 
 	#Do the actual search. TODO: Have this stuff configured by parameters of some sort
@@ -56,7 +57,7 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 		try: #The following two lines are what the function actually does: GET JSON data.
 			r = requests.get(query_url)
 			data = r.json()
-			test_cursor = data["scroll_cursor"] #If scroll_cursor is missing from the data for some reason, this'll throw an exception
+			test_cursor = data["min_position"] #If scroll_cursor is missing from the data for some reason, this'll throw an exception
 			
 			if len(data["items_html"])>20: #Sometimes we'll accidentally get a blank items_html field. TODO: This could be more elegant...
 				success = True
@@ -80,8 +81,9 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 			print "Process aborted at {0}".format(query_url)
 			raise #Always allow the process to be interrupted...
 
-		except: #... but catch other exceptions (like timeouts) and just keep trying
+		except Exception as e: #... but catch other exceptions (like timeouts) and just keep trying
 			print "Error trying to retrieve {0}".format(query_url)
+			print e
 			print "Retrying in {0} seconds".format(str(sleeptime*backoff))
 			backoff = backoff * (1+backoff_factor)
 			if (wait_time < max_sleep): 
@@ -198,7 +200,7 @@ def execute_search(query, since, until, crsor, is_realtime):
 				output_writer.writerow(tweet_set)
 
 			#Determine next page
-			next_cursor = data["scroll_cursor"]
+			next_cursor = data["min_position"]
 		
 		#No more data means we're done
 		else: # No more data means we're done
