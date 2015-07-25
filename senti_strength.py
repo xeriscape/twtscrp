@@ -92,6 +92,8 @@ def main(tweets_file):
 						#Occasionally let user know we're still live
 						rowcount += 1
 						if (rowcount % 100 == 0): print "Rows processed: {0}".format(rowcount);
+					else:
+						print "Row skipped: ",current_row
 	
 	#We're done!
 	print "Analysis complete."
