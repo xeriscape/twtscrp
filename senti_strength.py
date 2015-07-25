@@ -4,6 +4,7 @@
     your SentiStrength_Data folder and your CSV files to be analyzed. '''
 
 import time
+from time import sleep
 import datetime
 import glob
 import csv
@@ -16,24 +17,34 @@ def scrub_string(input_string):
 	clean = to_scrub.encode('ascii', errors='replace')
 	return clean
 
-def get_sentiment(sentiString, p):
+def get_sentiment(sentiString, p, count):
 	'''Take text, pass it to SentiStrengthCom.jar, compute sentiment. You can supply a pre-existing subprocess (p) e. g. if you want to use a nonstandard configuration. Note that it is strongly recommended to supply p even if you want to use the default configuration, as it makes very little sense to constantly close and re-open subprocesses. This function is partially based on the usage sample provided by Alec Larsen, University of the Witwatersrand, South Africa, 2012 (it's in the SentiStrength manual).'''
-
 	#If no process is supplied, open a subprocess using shlex to get the command line string into the correct args list format. Note that supplying 
-	if p is None:	
-		p = subprocess.Popen(shlex.split("java -jar SentiStrengthCom.jar trinary sentenceCombineTot explain stdin sentidata ./SentiStrength_Data/"),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
 
+	#print "Computing..."
 	#Communicate, via stdin, the string to be rated. Note that all spaces are replaced with +.
-	p.stdin.write(sentiString.replace(" ","+"))
+	sentiString = sentiString.replace(" ","+").replace("\n","+").replace("\t","+").replace("\r","+")
+	#print "Sending..."
+	p.stdin.write(sentiString)
+	#print "Sending..."
 	p.stdin.write("\n")
+	#stdout_text = p.communicate(sentiString+"\n")[0]
+	#p.stdin.write("\n")
 	
+	#print "Reading..."
 	#Read, via stdout, the results of the compotation. Remove linebreaks and quotes to make later analysis easier.
-	stdout_text = p.stdout.readline()	
+	stdout_text = p.stdout.readline()
+
+	p.stdout.flush()
+
+	#print stdout_text
 	stdout_text = stdout_text.replace('"', '^')
 	stdout_text = stdout_text.replace("\n", "")
 
 	#As the results of the computation are tab-delimited, the result string needs to be split on \t.
 	ret_val = stdout_text.split("\t")
+
+	sleep(0.01)
 
 	#Returns (by default) positive, negative, neutral, explanation
 	return ret_val
@@ -70,30 +81,50 @@ def main(tweets_file):
 				rowcount = 0
 				input_reader = csv.reader(input_file, dialect='excel-two')
 				for current_row in input_reader:
-					if ((current_row[0] != "Username") and (len(current_row)==4)): #Skip the row with the CSV file headers, skip malformed rows
-						#Force Tweet into ASCII and remove URLs (those confuse SentiStrength)
-						tweet_text = scrub_string(current_row[3])
+					try:
+						tweet_text = None
+						cur_time_float = None
+						cur_time = None
+						cur_hour = None
 
-						#Strip URLs - those confuse SentiStrength as they contain dots, which are interpreted as sentence ends						
-						tweet_text = re.sub(url_pattern, "<URL>", tweet_text)
+						if ((current_row[0] != "Username") and (len(current_row)==4)): #Skip the row with the CSV file headers, skip malformed rows
+							#Do process shenanigans
+							if ((rowcount % 100 ==0) or (p is None)):	
+								if p is not None:
+									p.communicate(None)
+									#print "New process..."
+									sleep(0.1)
+								p = subprocess.Popen(shlex.split("java -jar SentiStrengthCom.jar trinary sentenceCombineTot explain stdin sentidata ./SentiStrength_Data/"),stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE, bufsize=1)
 
-						#Compute day of Tweet. Date & hour are stored seperately, as this enables easy computing of both hourly and daily scores.
-						cur_time_float = (float(current_row[2]))
-						cur_time = (datetime.datetime.utcfromtimestamp(cur_time_float/1000)).date()
-						cur_hour = (datetime.datetime.utcfromtimestamp(cur_time_float/1000)).time().hour
+							#print "Doing",current_row
+							#Force Tweet into ASCII and remove URLs (those confuse SentiStrength)
+							tweet_text = scrub_string(current_row[3])
 
-						#Compute polarities of Tweet. Pad list if needed.
-						cur_polarities = get_sentiment(tweet_text, p)
-						cur_polarities += [''] * (4 - len(cur_polarities))
+							#Strip URLs - those confuse SentiStrength as they contain dots, which are interpreted as sentence ends						
+							tweet_text = re.sub(url_pattern, "<URL>", tweet_text)
 
-						#The data has now been assembled and can be saved.
-						output_writer.writerow([tweet_text, cur_time, cur_hour, cur_polarities[0], cur_polarities[1], cur_polarities[2], cur_polarities[3].replace('\n', '') ])
+							#Compute day of Tweet. Date & hour are stored seperately, as this enables easy computing of both hourly and daily scores.
+							cur_time_float = (float(current_row[2]))
+							cur_time = (datetime.datetime.utcfromtimestamp(cur_time_float/1000)).date()
+							cur_hour = (datetime.datetime.utcfromtimestamp(cur_time_float/1000)).time().hour
+
+							#Compute polarities of Tweet. Pad list if needed.
+							#print "Getting polarities"
+							cur_polarities = ["","","",""]
+							cur_polarities = get_sentiment(tweet_text, p, rowcount)
+							cur_polarities += [''] * (4 - len(cur_polarities))
+
+							#The data has now been assembled and can be saved.
+							output_writer.writerow([tweet_text.replace("\n", " "), cur_time, cur_hour, cur_polarities[0], cur_polarities[1], cur_polarities[2], cur_polarities[3].replace('\n', '').replace("\n", " ").replace("\r", " ") ])
 				
-						#Occasionally let user know we're still live
-						rowcount += 1
-						if (rowcount % 100 == 0): print "Rows processed: {0}".format(rowcount);
-					else:
-						print "Row skipped: ",current_row
+							#Occasionally let user know we're still live
+							rowcount += 1
+							if (rowcount % 100 == 0): print "Rows processed: {0}".format(rowcount);
+						else:
+							print "Row skipped: ",current_row
+					except Exception as e:
+							print e
+							print "Row skipped: ",current_row
 	
 	#We're done!
 	print "Analysis complete."
