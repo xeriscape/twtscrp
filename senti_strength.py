@@ -70,7 +70,7 @@ def main(tweets_file):
 				rowcount = 0
 				input_reader = csv.reader(input_file, dialect='excel-two')
 				for current_row in input_reader:
-					if (current_row[0] != "Username"): #Skip the row with the CSV file headers
+					if ((current_row[0] != "Username") and (len(current_row)==4)): #Skip the row with the CSV file headers, skip malformed rows
 						#Force Tweet into ASCII and remove URLs (those confuse SentiStrength)
 						tweet_text = scrub_string(current_row[3])
 
