@@ -123,6 +123,7 @@ def extract_tweets(raw_html):
 		to_append = HTMLParser().unescape(to_append)
 		to_append = to_append.encode('utf-8', errors='replace')
 		to_append = to_append.replace('\n', ' ')
+		to_append = to_append.replace(';', ',')
 
 		#Append the cleaned-up string to the active element
 		active_tweet.append(to_append)
