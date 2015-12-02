@@ -54,8 +54,10 @@ def get_search_chunk(query="", start_date="", end_date="", scroll_cursor="", is_
 		time.sleep(wait_time) #Throttle requests a bit.
 		r = None
 
-		try: #The following two lines are what the function actually does: GET JSON data.
-			r = requests.get(query_url)
+		try: #The following three lines are what the function actually does: GET JSON data.
+						
+			headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.86 Safari/537.36'}
+			r = requests.get(query_url, headers=headers)
 			data = r.json()
 			test_cursor = data["min_position"] #If scroll_cursor is missing from the data for some reason, this'll throw an exception
 			
