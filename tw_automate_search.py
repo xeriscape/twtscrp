@@ -1,5 +1,5 @@
-import websearch_scrape
-from websearch_scrape import get_search_chunk, extract_tweets, execute_search
+import tw_scarper
+from tw_scarper import get_search_chunk, extract_tweets, execute_search
 import glob, os
 #------------------------------------------------------------------------------
 def main():
@@ -13,7 +13,7 @@ def main():
 			is_realtime = True
 		
 			print "\n--------- Executing search ",x," ---------\n"
-			websearch_scrape.execute_search(query, since, until, crsor, is_realtime)
+			tw_scarper.execute_search(query, since, until, crsor, is_realtime)
 			
 		except (KeyboardInterrupt, SystemExit):
 			print "Process aborted."
