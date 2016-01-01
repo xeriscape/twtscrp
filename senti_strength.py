@@ -11,10 +11,24 @@ import csv
 import shlex, subprocess
 import re
 
+import codecs
+
+def replace_spc_error_handler(error):
+# error is an UnicodeEncodeError/UnicodeDecodeError instance
+# with these attributes:
+# object = unicode object being encoded
+# start:end = slice of object with error
+# reason = error message
+# Must return a tuple (replacement unicode object,
+# index into object to continue encoding)
+# or raise the same or another exception
+	return (u' ' * (error.end-error.start), error.end)
+
 def scrub_string(input_string):
 	''' Force string into ASCII for analysis. '''
-	to_scrub = input_string.decode('utf-8', errors='replace')
-	clean = to_scrub.encode('ascii', errors='replace')
+	codecs.register_error("replace_spc", replace_spc_error_handler) 
+	to_scrub = input_string.decode('utf-8', errors='replace_spc')
+	clean = to_scrub.encode('ascii', errors='replace_spc')
 	return clean
 
 def get_sentiment(sentiString, p, count):
@@ -22,7 +36,7 @@ def get_sentiment(sentiString, p, count):
 	#If no process is supplied, open a subprocess using shlex to get the command line string into the correct args list format. Note that supplying 
 
 	#Communicate, via stdin, the string to be rated. Note that all spaces are replaced with +.
-	sentiString = sentiString.replace(" ","+").replace("\n","+").replace("\t","+").replace("\r","+")
+	sentiString = scrub_string(sentiString).replace(" ","+").replace("\n","+").replace("\t","+").replace("\r","+")
 	p.stdin.write(sentiString)
 	p.stdin.write("\n")
 
